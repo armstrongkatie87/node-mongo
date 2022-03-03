@@ -1,6 +1,8 @@
 //reguired mongodb node.js driver & in MongoClient obj f/it
 const MongoClient = require('mongodb').MongoClient;
 const assert = require('assert').strict;
+//require the operations module assign to const dboper (short for database operations) and now have access to 4 methods in operations module thorugh dboper obj
+const dboper = require('./operations');
 //to set up connection to mongodb server
 const url = 'mongodb://localhost:27017/';//url to access mongodb server at port #
 const dbname = 'nucampsite'; //name of database want to connect to
@@ -18,19 +20,34 @@ MongoClient.connect(url, { useUnifiedTopology: true }, (err, client) => {
         assert.strictEqual(err, null);
         console.log('Dropped Collection', result);
 
-        //recreate campsite collection and get access to it through setting const collection obj
-        const collection = db.collection('campsites');
-        //insert a document into this colleciton using collecion obj just created
-        collection.insertOne({name: "Breadcrumb Trail Campground", description: "Test"},
-        (err, result) => {//callback pattern w/err handling convention for node
-            assert.strictEqual(err, null);
-            console.log('Insert Document:', result.ops);//ops property short for operations
-            //print to console all documents now in this collection, give empty () to find all
-            collection.find().toArray((err, docs) => {
-                assert.strictEqual(err, null);
+        //replaced call to collection.insertOne method to instead use the dboper.insertDoc()
+        dboper.insertDocument(db, { name: "Breadcrumb Trail Campground", description: "Test"},
+            'campsites', result => {
+            //in param list below we're defining a callback f(x) which won't be called till later-this part is f(x) def-code in it doesn't run here, will run later at end of insertDoc f(x) when called
+            console.log('Insert Document:', result.ops);
+
+            dboper.findDocuments(db, 'campsites', docs => {
                 console.log('Found Documents:', docs);
-                //will immediately close clients connection to mongodb server
-                client.close();
+
+                dboper.updateDocument(db, { name: "Breadcrumb Trail Campground" },
+                    { description: "Updated Test Description" }, 'campsites',
+                    result => {
+                        console.log('Updated Document Count:', result.result.nModified);
+
+                        dboper.findDocuments(db, 'campsites', docs => {
+                            console.log('Found Documents:', docs);
+
+                            dboper.removeDocument(db, { name: "Breadcrumb Trail Campground" },
+                                'campsites', result => {
+                                    console.log('Deleted Document Count:', result.deletedCount);
+
+                                    //will immediately close clients connection to mongodb server
+                                    client.close();
+                                }
+                            );
+                        });
+                    }
+                );
             });
         });
     });
